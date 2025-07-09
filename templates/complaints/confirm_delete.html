@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Denuncia - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Confirmar Eliminación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-warning-triangle-fill me-2"></i>
+                        <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+                    </div>
+                    
+                    <p>¿Está seguro que desea eliminar la siguiente denuncia?</p>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">SITADA:</dt>
+                                <dd class="col-sm-8">{{ object.sitada_number|default:"Sin SITADA" }}</dd>
+                                
+                                <dt class="col-sm-4">Acusado:</dt>
+                                <dd class="col-sm-8">{{ object.accused_name }}</dd>
+                                
+                                <dt class="col-sm-4">Tipo:</dt>
+                                <dd class="col-sm-8">{{ object.complaint_type.name|default:"Sin tipo" }}</dd>
+                                
+                                <dt class="col-sm-4">Fecha:</dt>
+                                <dd class="col-sm-8">{{ object.created_at|date:"d/m/Y H:i" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                    
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'complaints:list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash me-2"></i>Eliminar Denuncia
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

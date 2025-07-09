@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Mapa de Denuncias - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="bi bi-geo-alt-fill me-2"></i>
+                Mapa de Denuncias Ambientales
+            </h2>
+            
+            <!-- Controles -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="mapType" id="all" autocomplete="off" checked>
+                                <label class="btn btn-outline-primary" for="all">Todas</label>
+                                
+                                <input type="radio" class="btn-check" name="mapType" id="pending" autocomplete="off">
+                                <label class="btn btn-outline-warning" for="pending">Pendientes</label>
+                                
+                                <input type="radio" class="btn-check" name="mapType" id="resolved" autocomplete="off">
+                                <label class="btn btn-outline-success" for="resolved">Resueltas</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-outline-secondary" onclick="resetMap()">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Resetear Vista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mapa -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <div id="map" style="height: 600px; width: 100%;"></div>
+                </div>
+            </div>
+            
+            <!-- Leyenda -->
+            <div class="card mt-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Leyenda:</h6>
+                            <div class="d-flex flex-wrap">
+                                <span class="badge bg-warning me-2 mb-1">Pendiente</span>
+                                <span class="badge bg-info me-2 mb-1">En Proceso</span>
+                                <span class="badge bg-success me-2 mb-1">Resuelto</span>
+                                <span class="badge bg-secondary me-2 mb-1">Desestimado</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <small class="text-muted">
+                                Total de denuncias con ubicación: {{ complaints_with_location|length }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let map;
+    let markers = [];
+    let allComplaints = [];
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar mapa centrado en Costa Rica
+        map = L.map('map').setView([10.0, -84.0], 8);
+        
+        // Agregar capa de OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Cargar datos de denuncias desde JSON
+        allComplaints = {{ complaints_json|safe }};
+        
+        // Mostrar todas las denuncias inicialmente
+        showComplaints('all');
+        
+        // Event listeners para filtros
+        document.querySelectorAll('input[name="mapType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                showComplaints(this.id);
+            });
+        });
+    });
+    
+    function showComplaints(filter) {
+        // Limpiar marcadores existentes
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+        
+        // Filtrar denuncias
+        let filteredComplaints = allComplaints;
+        if (filter !== 'all') {
+            filteredComplaints = allComplaints.filter(complaint => {
+                return complaint.status === filter;
+            });
+        }
+        
+        // Agregar marcadores
+        filteredComplaints.forEach(complaint => {
+            // Extraer coordenadas del POINT (puede incluir SRID)
+            console.log('Processing complaint location:', complaint.location);
+            const coordsMatch = complaint.location.match(/POINT\s*\(([^)]+)\)/);
+            if (coordsMatch) {
+                const coords = coordsMatch[1].trim().split(' ');
+                const lng = parseFloat(coords[0]);
+                const lat = parseFloat(coords[1]);
+                
+                console.log('Parsed coordinates for complaint', complaint.id, ':', {lng, lat});
+                
+                // Determinar color del marcador según estado
+                let markerColor = 'blue';
+                let badgeClass = 'bg-primary';
+                
+                switch(complaint.status) {
+                    case 'pending':
+                        markerColor = 'orange';
+                        badgeClass = 'bg-warning';
+                        break;
+                    case 'in_progress':
+                        markerColor = 'blue';
+                        badgeClass = 'bg-info';
+                        break;
+                    case 'resolved':
+                        markerColor = 'green';
+                        badgeClass = 'bg-success';
+                        break;
+                    case 'dismissed':
+                        markerColor = 'gray';
+                        badgeClass = 'bg-secondary';
+                        break;
+                }
+                
+                // Crear marcador personalizado
+                const marker = L.marker([lat, lng]).addTo(map);
+                
+                // Popup con información
+                const popupContent = `
+                    <div style="min-width: 250px;">
+                        <h6><strong>${complaint.accused}</strong></h6>
+                        <p><strong>SITADA:</strong> ${complaint.sitada}</p>
+                        <p><strong>Tipo:</strong> ${complaint.type}</p>
+                        <p><strong>Área:</strong> ${complaint.area}</p>
+                        <p><strong>Estado:</strong> <span class="badge ${badgeClass}">${getStatusText(complaint.status)}</span></p>
+                        <p><strong>Fecha:</strong> ${complaint.date}</p>
+                        ${complaint.description ? `<p><strong>Descripción:</strong> ${complaint.description}</p>` : ''}
+                        <div class="mt-2">
+                            <a href="/denuncias/${complaint.id}/" class="btn btn-sm btn-outline-primary">Ver Detalle</a>
+                        </div>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent);
+                markers.push(marker);
+            }
+        });
+        
+        // Ajustar vista si hay marcadores
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    }
+    
+    function getStatusText(status) {
+        const statusMap = {
+            'pending': 'Pendiente',
+            'in_progress': 'En Proceso',
+            'resolved': 'Resuelto',
+            'dismissed': 'Desestimado'
+        };
+        return statusMap[status] || status;
+    }
+    
+    function resetMap() {
+        map.setView([10.0, -84.0], 8);
+    }
+</script>
+{% endblock %}

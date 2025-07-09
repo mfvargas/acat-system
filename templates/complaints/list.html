@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Denuncias Ambientales - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                    Denuncias Ambientales
+                </h2>
+                <a href="{% url 'complaints:create' %}" class="btn btn-success">
+                    <i class="bi bi-plus-circle me-2"></i>Nueva Denuncia
+                </a>
+            </div>
+            
+            <!-- Estadísticas rápidas -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">{{ total_complaints }}</h4>
+                                    <p class="card-text">Total Denuncias</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-file-earmark-text fs-2"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lista de denuncias -->
+            {% if complaints %}
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Lista de Denuncias</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>SITADA</th>
+                                        <th>Acusado</th>
+                                        <th>Tipo</th>
+                                        <th>Área Protegida</th>
+                                        <th>Estado</th>
+                                        <th>Fecha</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for complaint in complaints %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ complaint.sitada_number|default:"Sin SITADA" }}</span>
+                                        </td>
+                                        <td>{{ complaint.accused_name|truncatechars:30 }}</td>
+                                        <td>{{ complaint.complaint_type.name|default:"Sin tipo" }}</td>
+                                        <td>{{ complaint.protected_area.name|default:"Sin área" }}</td>
+                                        <td>
+                                            {% if complaint.status == 'pending' %}
+                                                <span class="badge bg-warning">Pendiente</span>
+                                            {% elif complaint.status == 'in_progress' %}
+                                                <span class="badge bg-info">En Proceso</span>
+                                            {% elif complaint.status == 'resolved' %}
+                                                <span class="badge bg-success">Resuelto</span>
+                                            {% elif complaint.status == 'dismissed' %}
+                                                <span class="badge bg-secondary">Desestimado</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark">{{ complaint.get_status_display }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ complaint.created_at|date:"d/m/Y" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'complaints:detail' complaint.pk %}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'complaints:update' complaint.pk %}" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Paginación -->
+                        {% if is_paginated %}
+                        <nav aria-label="Paginación de denuncias">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1">&laquo; Primera</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                    </span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Última &raquo;</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                        <h4>No hay denuncias registradas</h4>
+                        <p class="text-muted">Comienza agregando tu primera denuncia ambiental.</p>
+                        <a href="{% url 'complaints:create' %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle me-2"></i>Crear Primera Denuncia
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

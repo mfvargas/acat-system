@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block title %}Denuncia {{ complaint.sitada_number|default:"Sin SITADA" }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                    Detalle de Denuncia
+                </h2>
+                <div>
+                    <a href="{% url 'complaints:update' complaint.pk %}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil me-2"></i>Editar
+                    </a>
+                    <a href="{% url 'complaints:list' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Volver
+                    </a>
+                </div>
+            </div>
+            
+            <div class="row">
+                <!-- Información principal -->
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Información de la Denuncia</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <dl class="row">
+                                        <dt class="col-sm-5">SITADA:</dt>
+                                        <dd class="col-sm-7">
+                                            {% if complaint.sitada_number %}
+                                                <span class="badge bg-secondary">{{ complaint.sitada_number }}</span>
+                                            {% else %}
+                                                <span class="text-muted">No asignado</span>
+                                            {% endif %}
+                                        </dd>
+                                        
+                                        <dt class="col-sm-5">Acusado:</dt>
+                                        <dd class="col-sm-7">{{ complaint.accused_name }}</dd>
+                                        
+                                        <dt class="col-sm-5">Tipo:</dt>
+                                        <dd class="col-sm-7">
+                                            {{ complaint.complaint_type.name|default:"Sin tipo especificado" }}
+                                        </dd>
+                                        
+                                        <dt class="col-sm-5">Infracción:</dt>
+                                        <dd class="col-sm-7">
+                                            {{ complaint.infraction_type.name|default:"Sin infracción especificada" }}
+                                        </dd>
+                                    </dl>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <dl class="row">
+                                        <dt class="col-sm-5">Área Protegida:</dt>
+                                        <dd class="col-sm-7">
+                                            {{ complaint.protected_area.name|default:"Sin área especificada" }}
+                                        </dd>
+                                        
+                                        <dt class="col-sm-5">Sector:</dt>
+                                        <dd class="col-sm-7">
+                                            {{ complaint.sector.name|default:"Sin sector especificado" }}
+                                        </dd>
+                                        
+                                        <dt class="col-sm-5">Estado:</dt>
+                                        <dd class="col-sm-7">
+                                            {% if complaint.status == 'pending' %}
+                                                <span class="badge bg-warning">Pendiente</span>
+                                            {% elif complaint.status == 'in_progress' %}
+                                                <span class="badge bg-info">En Proceso</span>
+                                            {% elif complaint.status == 'resolved' %}
+                                                <span class="badge bg-success">Resuelto</span>
+                                            {% elif complaint.status == 'dismissed' %}
+                                                <span class="badge bg-secondary">Desestimado</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark">{{ complaint.get_status_display }}</span>
+                                            {% endif %}
+                                        </dd>
+                                        
+                                        <dt class="col-sm-5">Fecha:</dt>
+                                        <dd class="col-sm-7">{{ complaint.created_at|date:"d/m/Y H:i" }}</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                            
+                            {% if complaint.description %}
+                            <hr>
+                            <h6>Descripción:</h6>
+                            <p class="text-muted">{{ complaint.description|linebreaks }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mapa y ubicación -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Ubicación</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if complaint.location %}
+                                <div id="map" style="height: 300px; width: 100%;"></div>
+                                <small class="text-muted mt-2 d-block">
+                                    Coordenadas: {{ complaint.location }}
+                                </small>
+                            {% else %}
+                                <div class="text-center py-4">
+                                    <i class="bi bi-geo-alt display-4 text-muted"></i>
+                                    <p class="text-muted mt-2">Sin ubicación registrada</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Metadatos -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Metadatos</h6>
+                        </div>
+                        <div class="card-body">
+                            <small class="text-muted">
+                                <strong>Creado:</strong> {{ complaint.created_at|date:"d/m/Y H:i" }}<br>
+                                <strong>Actualizado:</strong> {{ complaint.updated_at|date:"d/m/Y H:i" }}<br>
+                                <strong>ID:</strong> {{ complaint.id }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if complaint.location %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Extraer coordenadas del POINT (puede incluir SRID)
+        const locationStr = '{{ complaint.location }}';
+        console.log('Location string:', locationStr);
+        const coordsMatch = locationStr.match(/POINT\s*\(([^)]+)\)/);
+        
+        if (coordsMatch) {
+            const coords = coordsMatch[1].trim().split(' ');
+            const lng = parseFloat(coords[0]);
+            const lat = parseFloat(coords[1]);
+            
+            console.log('Parsed coordinates:', {lng, lat});
+            
+            // Crear mapa
+            const map = L.map('map').setView([lat, lng], 15);
+            
+            // Agregar capa de OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Agregar marcador
+            L.marker([lat, lng]).addTo(map)
+                .bindPopup(`
+                    <strong>{{ complaint.accused_name }}</strong><br>
+                    {{ complaint.complaint_type.name|default:"Denuncia ambiental" }}<br>
+                    <small>{{ complaint.created_at|date:"d/m/Y" }}</small>
+                `)
+                .openPopup();
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
