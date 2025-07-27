@@ -19,14 +19,29 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+from django.http import HttpResponse
 
 # Configurar títulos del admin
 admin.site.site_header = "Sistema ACAT"
 admin.site.site_title = "ACAT Admin"
 admin.site.index_title = "Administración del Sistema ACAT"
 
+def custom_logout_view(request):
+    """Custom logout view that handles both GET and POST and redirects properly"""
+    logout(request)
+    return redirect('/admin/login/')
+
+# Override admin logout URL directly
+admin.site.logout_template = 'admin/logged_out.html'
+
 urlpatterns = [
+    # Custom logout handler BEFORE admin URLs
+    path("admin/logout/", custom_logout_view, name='admin_logout'),
     path("admin/", admin.site.urls),
+    # Backup logout URL in case admin doesn't work
+    path("logout/", custom_logout_view, name='logout'),
     path("", TemplateView.as_view(template_name="base.html"), name="home"),
     path("denuncias/", include("apps.complaints.urls")),
     path("dashboard/", include("apps.dashboard.urls")),

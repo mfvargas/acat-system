@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+// ACAT Logout Fix - Inline JavaScript to handle admin logout issues
+(function() {
+    'use strict';
+    
+    function handleLogout() {
+        console.log('ACAT: Redirecting to login after logout...');
+        window.location.href = '/admin/login/';
+    }
+    
+    function checkForBlankPage() {
+        const body = document.body;
+        const content = body.textContent || body.innerText || '';
+        
+        // If page is essentially empty or just whitespace
+        if (content.trim().length < 50 && document.title === '') {
+            console.log('ACAT: Blank page detected, redirecting...');
+            handleLogout();
+            return true;
+        }
+        
+        // Check for logout in URL
+        if (window.location.pathname.includes('/admin/logout/')) {
+            console.log('ACAT: Logout URL detected, redirecting...');
+            setTimeout(handleLogout, 100);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    function addLogoutHandlers() {
+        const logoutLinks = document.querySelectorAll('a[href*="logout"], input[value*="Cerrar"]');
+        
+        logoutLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                console.log('ACAT: Logout clicked');
+                setTimeout(function() {
+                    if (checkForBlankPage()) return;
+                    
+                    if (window.location.pathname.startsWith('/admin') && 
+                        !window.location.pathname.includes('/login/')) {
+                        handleLogout();
+                    }
+                }, 1000);
+            });
+        });
+    }
+    
+    function init() {
+        console.log('ACAT: Logout fix loaded');
+        
+        if (checkForBlankPage()) return;
+        addLogoutHandlers();
+        
+        // Fallback check
+        setInterval(function() {
+            if (document.body && checkForBlankPage()) return;
+        }, 2000);
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+{% endblock %}

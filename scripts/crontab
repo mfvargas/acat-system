@@ -1,0 +1,17 @@
+# ACAT System - Cron Jobs for Staging Environment
+
+# Daily backup at 2:00 AM
+0 2 * * * /app/scripts/backup.sh >> /app/logs/backup.log 2>&1
+
+# Health check every 5 minutes
+*/5 * * * * /app/scripts/health-check.sh >> /app/logs/health.log 2>&1
+
+# Clear old logs weekly (Sunday at 1:00 AM)
+0 1 * * 0 find /app/logs -name "*.log" -mtime +7 -delete
+
+# Django cleanup commands
+# Clear expired sessions daily at 3:00 AM
+0 3 * * * cd /app && python manage.py clearsessions >> /app/logs/cleanup.log 2>&1
+
+# Clear cache weekly (Sunday at 4:00 AM)  
+0 4 * * 0 cd /app && python manage.py shell -c "from django.core.cache import cache; cache.clear()" >> /app/logs/cleanup.log 2>&1

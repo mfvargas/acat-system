@@ -17,7 +17,7 @@ DATABASES = {
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
         'OPTIONS': {
-            'sslmode': 'require',
+            'sslmode': 'disable',
         },
     }
 }
@@ -26,6 +26,7 @@ ALLOWED_HOSTS = [
     'staging.acatcr.org',
     'localhost',
     '127.0.0.1',
+    '159.65.122.13',  # DigitalOcean server IP
 ]
 
 # CSRF and CORS for staging
@@ -43,6 +44,16 @@ MEDIA_ROOT = '/var/www/acat-system/media/'
 
 # Email backend for staging (console for testing)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Authentication URLs for staging
+LOGOUT_REDIRECT_URL = '/admin/login/'  # Redirect to admin login after logout
+LOGIN_REDIRECT_URL = '/admin/'  # Redirect to admin dashboard after login
+LOGIN_URL = '/admin/login/'  # Default login URL
+
+# Admin logout configuration
+ADMIN_URL = '/admin/'
+USE_I18N = True
+USE_L10N = True
 
 # Security - relaxed for staging
 SECURE_SSL_REDIRECT = False

@@ -1,0 +1,120 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django Admin') }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_header|default:_('Sistema ACAT') }}</a>
+</h1>
+{% endblock %}
+
+{% block nav-global %}
+{% if user.is_active and user.is_staff %}
+<div id="user-tools">
+    {% block welcome-msg %}
+        {% trans 'Welcome,' %}
+        <strong>{% firstof user.get_short_name user.get_username %}</strong>.
+    {% endblock %}
+    {% block userlinks %}
+        {% if site_url %}
+            <a href="{{ site_url }}">{% trans 'View site' %}</a> /
+        {% endif %}
+        {% if user.has_usable_password %}
+            <a href="{% url 'admin:password_change' %}">{% trans 'Change password' %}</a> /
+        {% endif %}
+        <a href="{% url 'admin:logout' %}">{% trans 'Log out' %}</a>
+    {% endblock %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+// ACAT Logout Fix - Detects and fixes blank page after logout
+(function() {
+    'use strict';
+    
+    function redirectToLogin() {
+        console.log('ACAT: Redirigiendo al login...');
+        window.location.replace('/admin/login/');
+    }
+    
+    function checkForBlankOrLogout() {
+        const body = document.body;
+        const content = (body.textContent || body.innerText || '').trim();
+        const title = document.title.trim();
+        const url = window.location.pathname;
+        
+        // Check if we're on logout URL
+        if (url.includes('/admin/logout/')) {
+            console.log('ACAT: Logout URL detected');
+            setTimeout(redirectToLogin, 200);
+            return true;
+        }
+        
+        // Check for blank page (less than 100 chars of content)
+        if (content.length < 100 && (!title || title.length < 10)) {
+            console.log('ACAT: Página en blanco detectada, redirecting...');
+            setTimeout(redirectToLogin, 500);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    function addLogoutClickHandlers() {
+        // Handle logout links by intercepting and redirecting
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            const href = target.getAttribute('href') || '';
+            const text = target.textContent || target.value || '';
+            
+            if (href.includes('logout') || text.includes('Cerrar') || text.includes('Logout')) {
+                console.log('ACAT: Logout link clicked, intercepting...');
+                
+                // Prevent default behavior
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Redirect to our custom logout
+                console.log('ACAT: Redirecting to custom logout URL');
+                window.location.href = '/logout/';
+                
+                return false;
+            }
+        });
+    }
+    
+    function init() {
+        console.log('ACAT: Logout fix initialized');
+        
+        // Check immediately if we're already on a problematic page
+        if (checkForBlankOrLogout()) {
+            return;
+        }
+        
+        // Add click handlers
+        addLogoutClickHandlers();
+        
+        // Periodic check for blank pages
+        setInterval(function() {
+            if (checkForBlankOrLogout()) {
+                return;
+            }
+        }, 3000);
+    }
+    
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    
+    // Also initialize after a short delay as fallback
+    setTimeout(init, 500);
+})();
+</script>
+{% endblock %}
