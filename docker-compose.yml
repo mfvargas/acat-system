@@ -27,7 +27,7 @@ services:
   web:
     build: .
     container_name: acat_web
-    command: python manage.py runserver 0.0.0.0:8000
+    command: ["/app/entrypoint.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -40,7 +40,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=acat_system.settings.development
     env_file:
-      - .env
+      - .env.docker
 
 volumes:
   postgres_data:

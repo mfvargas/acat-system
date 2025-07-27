@@ -23,15 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput --settings=acat_system.settings.production
+# Create necessary directories
+RUN mkdir -p /var/log/acat-system /app/staticfiles /app/media
 
-# Create entrypoint script
-RUN echo '#!/bin/bash\n\
-python manage.py migrate\n\
-python manage.py collectstatic --noinput\n\
-exec "$@"' > /app/entrypoint.sh && \
-chmod +x /app/entrypoint.sh
+# Copy and set up entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "acat_system.wsgi:application"]
