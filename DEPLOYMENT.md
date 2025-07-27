@@ -256,9 +256,8 @@ Examples:
 - supervisor.pacifico (Pacific Region Supervisor)
 ```
 
-#### **Test Users Available**:
-- **admin** / `admin123` (Main administrator)
-- **test_admin** / `nueva123` (Testing purposes)
+#### **Active System Users**:
+- **admin** / `admin123` (Main system administrator)
 
 ### 📱 **GitHub Repository**
 
