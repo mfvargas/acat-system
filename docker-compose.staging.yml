@@ -66,6 +66,15 @@ services:
     restart: unless-stopped
     networks:
       - acat_staging_network
+    # Resource limits to fix exit code 137 (memory issues)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     logging:
       driver: "json-file"
       options:

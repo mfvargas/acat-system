@@ -43,6 +43,11 @@ urlpatterns = [
     # Backup logout URL in case admin doesn't work
     path("logout/", custom_logout_view, name='logout'),
     path("", TemplateView.as_view(template_name="base.html"), name="home"),
+    
+    # App URLs
+    path("denuncias/", include("apps.complaints.urls")),
+    path("dashboard/", include("apps.dashboard.urls")),
+    path("biodiversidad/", include("apps.biodiversity.urls")),
     path("denuncias/", include("apps.complaints.urls")),
     path("dashboard/", include("apps.dashboard.urls")),
     path("api/", include("apps.complaints.api_urls")),

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: acat_postgres_simple
+    environment:
+      POSTGRES_DB: acat_staging
+      POSTGRES_USER: acat_staging_user
+      POSTGRES_PASSWORD: staging_password_2025
+      PGUSER: acat_staging_user
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: acat_redis_simple
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.staging
+    container_name: acat_web_simple
+    environment:
+      DEBUG: 'False'
+      DJANGO_SETTINGS_MODULE: acat_system.settings.staging
+      DATABASE_URL: 'postgresql://acat_staging_user:staging_password_2025@db:5432/acat_staging'
+      REDIS_URL: 'redis://redis:6379/0'
+      SECRET_KEY: 'staging-secret-key-change-in-production'
+      ALLOWED_HOSTS: 'localhost,127.0.0.1,0.0.0.0'
+    ports:
+      - "8080:8000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_files:
+  media_files:
+
+networks:
+  default:
+    name: acat_staging_simple

@@ -1,0 +1,385 @@
+{% extends 'biodiversity/base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Especies</li>
+{% endblock %}
+
+{% block page_title %}Listado de Especies{% endblock %}
+{% block page_description %}{{ total_species }} especies registradas en el ACAT{% endblock %}
+
+{% block page_actions %}
+{{ block.super }}
+<div class="btn-group ms-2" role="group">
+    <a href="{% url 'biodiversity:export_species' %}" class="btn btn-outline-success btn-sm">
+        <i class="fas fa-download me-1"></i> Exportar
+    </a>
+</div>
+{% endblock %}
+
+{% block main_content %}
+<div class="row">
+    <!-- Filters Sidebar -->
+    <div class="col-md-3">
+        <div class="filter-sidebar sticky-top">
+            <h5 class="mb-3">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h5>
+            
+            <form method="get" id="filter-form">
+                <!-- Search -->
+                <div class="mb-3">
+                    <label for="search" class="form-label">Búsqueda</label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="search" 
+                           name="search" 
+                           value="{{ current_filters.search }}"
+                           placeholder="Nombre científico, común, familia...">
+                </div>
+                
+                <!-- Kingdom Filter -->
+                <div class="mb-3">
+                    <label for="kingdom" class="form-label">Reino</label>
+                    <select class="form-select" id="kingdom" name="kingdom">
+                        <option value="">Todos los reinos</option>
+                        {% for kingdom in kingdoms %}
+                            <option value="{{ kingdom }}" 
+                                    {% if current_filters.kingdom == kingdom %}selected{% endif %}>
+                                {{ kingdom }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Family Filter -->
+                <div class="mb-3">
+                    <label for="family" class="form-label">Familia</label>
+                    <select class="form-select" id="family" name="family">
+                        <option value="">Todas las familias</option>
+                        {% for family in families %}
+                            <option value="{{ family }}" 
+                                    {% if current_filters.family == family %}selected{% endif %}>
+                                {{ family }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Genus Filter -->
+                <div class="mb-3">
+                    <label for="genus" class="form-label">Género</label>
+                    <select class="form-select" id="genus" name="genus">
+                        <option value="">Todos los géneros</option>
+                        {% for genus in genera %}
+                            <option value="{{ genus }}" 
+                                    {% if current_filters.genus == genus %}selected{% endif %}>
+                                {{ genus }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Conservation Filter -->
+                <div class="mb-3">
+                    <label for="conservation" class="form-label">Estado de Conservación</label>
+                    <select class="form-select" id="conservation" name="conservation">
+                        <option value="">Todos los estados</option>
+                        <option value="threatened" {% if current_filters.conservation == 'threatened' %}selected{% endif %}>
+                            Especies amenazadas
+                        </option>
+                        <option value="endemic" {% if current_filters.conservation == 'endemic' %}selected{% endif %}>
+                            Endémicas del ACAT
+                        </option>
+                    </select>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i> Filtrar
+                    </button>
+                    <a href="{% url 'biodiversity:species_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Limpiar
+                    </a>
+                </div>
+            </form>
+            
+            <!-- Statistics -->
+            <div class="mt-4 p-3 bg-light rounded">
+                <h6 class="mb-2">Estadísticas</h6>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Total especies:</small>
+                    <small><strong>{{ total_species }}</strong></small>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Total registros:</small>
+                    <small><strong>{{ total_occurrences }}</strong></small>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Amenazadas:</small>
+                    <small><strong>{{ threatened_species }}</strong></small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Species List -->
+    <div class="col-md-9">
+        {% if species_list %}
+            <!-- Results Header -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <span class="text-muted">
+                        Mostrando {{ species_list|length }} de {{ paginator.count }} especies
+                    </span>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="view-mode" id="card-view" autocomplete="off" checked>
+                    <label class="btn btn-outline-secondary" for="card-view">
+                        <i class="fas fa-th-large"></i>
+                    </label>
+                    
+                    <input type="radio" class="btn-check" name="view-mode" id="list-view" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="list-view">
+                        <i class="fas fa-list"></i>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Species Cards -->
+            <div id="species-container">
+                <div class="row" id="card-container">
+                    {% for species in species_list %}
+                        <div class="col-lg-6 col-xl-4 mb-4">
+                            <div class="card species-card h-100">
+                                <div class="card-body">
+                                    <!-- Scientific Name -->
+                                    <h5 class="card-title">
+                                        <a href="{% url 'biodiversity:species_detail' species.pk %}" 
+                                           class="text-decoration-none">
+                                            <em>{{ species.scientific_name }}</em>
+                                        </a>
+                                        {% if species.common_name %}
+                                            <small class="text-muted d-block">{{ species.common_name }}</small>
+                                        {% endif %}
+                                    </h5>
+                                    
+                                    <!-- Taxonomy -->
+                                    <div class="taxonomy-hierarchy mb-2">
+                                        <small>
+                                            {{ species.kingdom }} > {{ species.phylum }} > 
+                                            {{ species.class_name }} > {{ species.order }} > 
+                                            <strong>{{ species.family }}</strong>
+                                        </small>
+                                    </div>
+                                    
+                                    <!-- Conservation Status -->
+                                    <div class="mb-2">
+                                        {% if species.conservation_status %}
+                                            {% with cs=species.conservation_status %}
+                                                {% if cs.rlcvs_status != 'NR' %}
+                                                    <span class="badge bg-warning conservation-badge me-1">
+                                                        RLCVS: {{ cs.get_rlcvs_status_display }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if cs.cites_status != 'NONE' %}
+                                                    <span class="badge bg-danger conservation-badge me-1">
+                                                        CITES: {{ cs.cites_status }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if cs.iucn_status not in 'LC,NE' %}
+                                                    <span class="badge bg-info conservation-badge me-1">
+                                                        UICN: {{ cs.iucn_status }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if cs.endemic_to_acat %}
+                                                    <span class="badge bg-success conservation-badge me-1">
+                                                        Endémica ACAT
+                                                    </span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Occurrence Count -->
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            <i class="fas fa-map-marker-alt me-1"></i>
+                                            {{ species.occurrence_count }} registros
+                                        </small>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'biodiversity:species_detail' species.pk %}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                Ver detalles
+                                            </a>
+                                            {% if species.occurrence_count > 0 %}
+                                                <a href="{% url 'biodiversity:species_map' species.pk %}" 
+                                                   class="btn btn-outline-success btn-sm">
+                                                    <i class="fas fa-map"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- List View (initially hidden) -->
+                <div class="table-responsive d-none" id="list-container">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre Científico</th>
+                                <th>Familia</th>
+                                <th>Reino</th>
+                                <th>Estado de Conservación</th>
+                                <th>Registros</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for species in species_list %}
+                                <tr>
+                                    <td>
+                                        <em>{{ species.scientific_name }}</em>
+                                        {% if species.common_name %}
+                                            <br><small class="text-muted">{{ species.common_name }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ species.family }}</td>
+                                    <td>{{ species.kingdom }}</td>
+                                    <td>
+                                        {% if species.conservation_status %}
+                                            {% with cs=species.conservation_status %}
+                                                {% if cs.is_threatened %}
+                                                    <span class="badge bg-warning">Amenazada</span>
+                                                {% endif %}
+                                                {% if cs.endemic_to_acat %}
+                                                    <span class="badge bg-success">Endémica</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ species.occurrence_count }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'biodiversity:species_detail' species.pk %}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                Ver
+                                            </a>
+                                            {% if species.occurrence_count > 0 %}
+                                                <a href="{% url 'biodiversity:species_map' species.pk %}" 
+                                                   class="btn btn-outline-success btn-sm">
+                                                    Mapa
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Pagination -->
+            {% if is_paginated %}
+                <nav aria-label="Paginación de especies" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    Primera
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    Anterior
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    Siguiente
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    Última
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <!-- No Results -->
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No se encontraron especies</h4>
+                <p class="text-muted">Intenta ajustar los filtros de búsqueda.</p>
+                <a href="{% url 'biodiversity:species_list' %}" class="btn btn-primary">
+                    Ver todas las especies
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block biodiversity_js %}
+<script>
+    // View mode toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const cardView = document.getElementById('card-view');
+        const listView = document.getElementById('list-view');
+        const cardContainer = document.getElementById('card-container');
+        const listContainer = document.getElementById('list-container');
+        
+        cardView.addEventListener('change', function() {
+            if (this.checked) {
+                cardContainer.classList.remove('d-none');
+                listContainer.classList.add('d-none');
+            }
+        });
+        
+        listView.addEventListener('change', function() {
+            if (this.checked) {
+                cardContainer.classList.add('d-none');
+                listContainer.classList.remove('d-none');
+            }
+        });
+        
+        // Auto-submit form on filter change
+        const filterForm = document.getElementById('filter-form');
+        const filterInputs = filterForm.querySelectorAll('select');
+        
+        filterInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                filterForm.submit();
+            });
+        });
+        
+        // Search with delay
+        const searchInput = document.getElementById('search');
+        let searchTimeout;
+        
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                filterForm.submit();
+            }, 1000); // 1 second delay
+        });
+    });
+</script>
+{% endblock %}

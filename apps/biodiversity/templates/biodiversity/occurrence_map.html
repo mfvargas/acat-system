@@ -1,0 +1,473 @@
+{% extends 'biodiversity/base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Mapa de Registros</li>
+{% endblock %}
+
+{% block page_title %}Mapa de Registros de Presencia{% endblock %}
+{% block page_description %}Visualización espacial de los registros de biodiversidad del ACAT{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{% url 'biodiversity:species_list' %}" class="btn btn-outline-primary">
+        <i class="fas fa-list me-1"></i> Especies
+    </a>
+    <a href="{% url 'biodiversity:occurrence_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-table me-1"></i> Lista de Registros
+    </a>
+    <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#exportModal">
+        <i class="fas fa-download me-1"></i> Exportar
+    </button>
+</div>
+{% endblock %}
+
+{% block main_content %}
+<div class="row">
+    <!-- Map Controls Sidebar -->
+    <div class="col-md-3">
+        <div class="filter-sidebar sticky-top">
+            <h5 class="mb-3">
+                <i class="fas fa-sliders-h me-2"></i>Controles del Mapa
+            </h5>
+            
+            <!-- Filters -->
+            <form id="map-filters">
+                <!-- Family Filter -->
+                <div class="mb-3">
+                    <label for="family-filter" class="form-label">Familia</label>
+                    <select class="form-select form-select-sm" id="family-filter" name="family">
+                        <option value="">Todas las familias</option>
+                        {% for family in families %}
+                            <option value="{{ family }}">{{ family }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Year Filter -->
+                <div class="mb-3">
+                    <label for="year-filter" class="form-label">Año</label>
+                    <select class="form-select form-select-sm" id="year-filter" name="year">
+                        <option value="">Todos los años</option>
+                        {% for year in years %}
+                            <option value="{{ year }}">{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Conservation Status -->
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="threatened-only" name="threatened">
+                        <label class="form-check-label" for="threatened-only">
+                            Solo especies amenazadas
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="endemic-only" name="endemic">
+                        <label class="form-check-label" for="endemic-only">
+                            Solo especies endémicas
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="button" class="btn btn-primary btn-sm" id="apply-filters">
+                        <i class="fas fa-filter me-1"></i> Aplicar Filtros
+                    </button>
+                </div>
+            </form>
+            
+            <hr>
+            
+            <!-- Map Layers -->
+            <h6>Capas del Mapa</h6>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="cluster-markers" checked>
+                    <label class="form-check-label" for="cluster-markers">
+                        Agrupar marcadores
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="heat-map">
+                    <label class="form-check-label" for="heat-map">
+                        Mapa de calor
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Leyenda</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="marker-sample bg-success rounded-circle me-2" style="width: 10px; height: 10px;"></div>
+                        <small>Especies no amenazadas</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="marker-sample bg-warning rounded-circle me-2" style="width: 10px; height: 10px;"></div>
+                        <small>Especies amenazadas</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="marker-sample bg-danger rounded-circle me-2" style="width: 10px; height: 10px;"></div>
+                        <small>Especies en peligro crítico</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistics -->
+            <div class="mt-3 p-3 bg-light rounded">
+                <h6 class="mb-2">Estadísticas Actuales</h6>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Registros visibles:</small>
+                    <small><strong id="visible-count">Cargando...</strong></small>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Especies únicas:</small>
+                    <small><strong id="species-count">Cargando...</strong></small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Map -->
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-body p-0">
+                <div id="main-map" style="height: 600px; width: 100%;"></div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Haz clic en los marcadores para ver detalles
+                    </small>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" id="zoom-to-fit">
+                            <i class="fas fa-expand-arrows-alt"></i> Ajustar vista
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="reset-map">
+                            <i class="fas fa-undo"></i> Reiniciar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" 
+     style="background-color: rgba(0,0,0,0.5); z-index: 9999; display: none !important;">
+    <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Exportar Datos del Mapa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Exportar los registros actualmente visibles en el mapa:</p>
+                <div class="mb-3">
+                    <label for="export-format" class="form-label">Formato:</label>
+                    <select class="form-select" id="export-format">
+                        <option value="csv">CSV</option>
+                        <option value="geojson">GeoJSON</option>
+                        <option value="kml">KML (Google Earth)</option>
+                    </select>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="include-conservation" checked>
+                    <label class="form-check-label" for="include-conservation">
+                        Incluir información de conservación
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="export-data">
+                    <i class="fas fa-download me-1"></i> Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block biodiversity_js %}
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+<script>
+    let map;
+    let markersCluster;
+    let heatLayer;
+    let currentData = [];
+    let allMarkers = [];
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize map
+        map = initializeMap('main-map', {
+            center: [10.3, -84.5],
+            zoom: 9
+        });
+        
+        // Initialize marker cluster group
+        markersCluster = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true
+        });
+        
+        // Load initial data
+        loadMapData();
+        
+        // Event listeners
+        document.getElementById('apply-filters').addEventListener('click', loadMapData);
+        document.getElementById('cluster-markers').addEventListener('change', toggleClustering);
+        document.getElementById('heat-map').addEventListener('change', toggleHeatMap);
+        document.getElementById('zoom-to-fit').addEventListener('click', zoomToFit);
+        document.getElementById('reset-map').addEventListener('click', resetMap);
+        document.getElementById('export-data').addEventListener('click', exportData);
+    });
+    
+    function loadMapData() {
+        showLoading();
+        
+        // Get filter values
+        const filters = {
+            family: document.getElementById('family-filter').value,
+            year: document.getElementById('year-filter').value,
+            threatened: document.getElementById('threatened-only').checked,
+            endemic: document.getElementById('endemic-only').checked
+        };
+        
+        // Build query string
+        const params = new URLSearchParams();
+        Object.keys(filters).forEach(key => {
+            if (filters[key]) {
+                params.append(key, filters[key]);
+            }
+        });
+        
+        // Fetch data from API
+        fetch(`{% url 'biodiversity:api_map_data' %}?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                currentData = data.features;
+                updateMap();
+                updateStatistics();
+                hideLoading();
+            })
+            .catch(error => {
+                console.error('Error loading map data:', error);
+                hideLoading();
+            });
+    }
+    
+    function updateMap() {
+        // Clear existing markers and layers
+        if (markersCluster) {
+            map.removeLayer(markersCluster);
+        }
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
+        }
+        
+        markersCluster.clearLayers();
+        allMarkers = [];
+        
+        // Add new markers
+        currentData.forEach(feature => {
+            const coords = feature.geometry.coordinates;
+            const props = feature.properties;
+            
+            // Determine marker color based on conservation status
+            let markerColor = '#28a745'; // Green for normal species
+            if (props.conservation_status) {
+                if (props.conservation_status.is_threatened) {
+                    markerColor = '#ffc107'; // Yellow for threatened
+                }
+                if (props.conservation_status.iucn_status === 'CR') {
+                    markerColor = '#dc3545'; // Red for critically endangered
+                }
+            }
+            
+            // Create marker
+            const marker = L.circleMarker([coords[1], coords[0]], {
+                radius: 6,
+                fillColor: markerColor,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+            
+            // Add popup
+            const popupContent = `
+                <div class="popup-content">
+                    <h6><em>${props.species}</em></h6>
+                    <p class="mb-1"><strong>Familia:</strong> ${props.family}</p>
+                    ${props.locality ? `<p class="mb-1"><strong>Localidad:</strong> ${props.locality}</p>` : ''}
+                    ${props.event_date ? `<p class="mb-1"><strong>Fecha:</strong> ${new Date(props.event_date).toLocaleDateString()}</p>` : ''}
+                    <p class="mb-0"><strong>Tipo:</strong> ${props.basis_of_record || 'No especificado'}</p>
+                    <div class="mt-2">
+                        <a href="/biodiversity/registros/${props.id}/" class="btn btn-sm btn-outline-primary">Ver detalles</a>
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            allMarkers.push(marker);
+            markersCluster.addLayer(marker);
+        });
+        
+        // Add cluster layer to map if clustering is enabled
+        if (document.getElementById('cluster-markers').checked) {
+            map.addLayer(markersCluster);
+        } else {
+            // Add individual markers
+            allMarkers.forEach(marker => {
+                map.addLayer(marker);
+            });
+        }
+        
+        // Update heat map if enabled
+        if (document.getElementById('heat-map').checked) {
+            updateHeatMap();
+        }
+    }
+    
+    function toggleClustering() {
+        const clusterEnabled = document.getElementById('cluster-markers').checked;
+        
+        if (clusterEnabled) {
+            // Remove individual markers and add cluster
+            allMarkers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            map.addLayer(markersCluster);
+        } else {
+            // Remove cluster and add individual markers
+            map.removeLayer(markersCluster);
+            allMarkers.forEach(marker => {
+                map.addLayer(marker);
+            });
+        }
+    }
+    
+    function toggleHeatMap() {
+        const heatEnabled = document.getElementById('heat-map').checked;
+        
+        if (heatEnabled) {
+            updateHeatMap();
+        } else {
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+        }
+    }
+    
+    function updateHeatMap() {
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
+        }
+        
+        const heatData = currentData.map(feature => {
+            const coords = feature.geometry.coordinates;
+            return [coords[1], coords[0], 1]; // lat, lng, intensity
+        });
+        
+        heatLayer = L.heatLayer(heatData, {
+            radius: 20,
+            blur: 15,
+            maxZoom: 17,
+            gradient: {
+                0.0: 'blue',
+                0.5: 'lime',
+                1.0: 'red'
+            }
+        });
+        
+        map.addLayer(heatLayer);
+    }
+    
+    function updateStatistics() {
+        const visibleCount = currentData.length;
+        const uniqueSpecies = new Set(currentData.map(f => f.properties.species)).size;
+        
+        document.getElementById('visible-count').textContent = visibleCount.toLocaleString();
+        document.getElementById('species-count').textContent = uniqueSpecies.toLocaleString();
+    }
+    
+    function zoomToFit() {
+        if (currentData.length > 0) {
+            const group = new L.featureGroup(allMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    }
+    
+    function resetMap() {
+        map.setView([10.3, -84.5], 9);
+        
+        // Reset filters
+        document.getElementById('family-filter').selectedIndex = 0;
+        document.getElementById('year-filter').selectedIndex = 0;
+        document.getElementById('threatened-only').checked = false;
+        document.getElementById('endemic-only').checked = false;
+        
+        loadMapData();
+    }
+    
+    function exportData() {
+        const format = document.getElementById('export-format').value;
+        const includeConservation = document.getElementById('include-conservation').checked;
+        
+        // Get current filters
+        const filters = {
+            family: document.getElementById('family-filter').value,
+            year: document.getElementById('year-filter').value,
+            threatened: document.getElementById('threatened-only').checked,
+            endemic: document.getElementById('endemic-only').checked,
+            format: format,
+            include_conservation: includeConservation
+        };
+        
+        // Build download URL
+        const params = new URLSearchParams();
+        Object.keys(filters).forEach(key => {
+            if (filters[key]) {
+                params.append(key, filters[key]);
+            }
+        });
+        
+        // Trigger download
+        const downloadUrl = `{% url 'biodiversity:export_occurrences' %}?${params.toString()}`;
+        window.open(downloadUrl, '_blank');
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+        modal.hide();
+    }
+    
+    function showLoading() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+    }
+    
+    function hideLoading() {
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+</script>
+{% endblock %}

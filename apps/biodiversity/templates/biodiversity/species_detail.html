@@ -1,0 +1,388 @@
+{% extends 'biodiversity/base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'biodiversity:species_list' %}">Especies</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ species.scientific_name }}</li>
+{% endblock %}
+
+{% block page_title %}{{ species.scientific_name }}{% endblock %}
+{% block page_description %}
+{% if species.common_name %}{{ species.common_name }} - {% endif %}
+Familia {{ species.family }}
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{% url 'biodiversity:species_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Volver a la lista
+    </a>
+    {% if has_occurrences %}
+        <a href="{% url 'biodiversity:species_map' species.pk %}" class="btn btn-outline-success">
+            <i class="fas fa-map me-1"></i> Ver en mapa
+        </a>
+    {% endif %}
+    <a href="{% url 'biodiversity:occurrence_list' %}?species={{ species.pk }}" class="btn btn-outline-primary">
+        <i class="fas fa-list me-1"></i> Ver registros
+    </a>
+</div>
+{% endblock %}
+
+{% block main_content %}
+<div class="row">
+    <!-- Species Information -->
+    <div class="col-lg-8">
+        <!-- Basic Information Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Información Taxonómica
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Reino:</dt>
+                            <dd class="col-sm-8">{{ species.kingdom }}</dd>
+                            
+                            <dt class="col-sm-4">Filo:</dt>
+                            <dd class="col-sm-8">{{ species.phylum }}</dd>
+                            
+                            <dt class="col-sm-4">Clase:</dt>
+                            <dd class="col-sm-8">{{ species.class_name }}</dd>
+                            
+                            <dt class="col-sm-4">Orden:</dt>
+                            <dd class="col-sm-8">{{ species.order }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Familia:</dt>
+                            <dd class="col-sm-8">
+                                <strong>{{ species.family }}</strong>
+                            </dd>
+                            
+                            <dt class="col-sm-4">Género:</dt>
+                            <dd class="col-sm-8">
+                                <em>{{ species.genus }}</em>
+                            </dd>
+                            
+                            <dt class="col-sm-4">Especie:</dt>
+                            <dd class="col-sm-8">
+                                <em>{{ species.species }}</em>
+                            </dd>
+                            
+                            <dt class="col-sm-4">GBIF Key:</dt>
+                            <dd class="col-sm-8">
+                                <a href="https://www.gbif.org/species/{{ species.taxon_key }}" 
+                                   target="_blank" class="text-decoration-none">
+                                    {{ species.taxon_key }}
+                                    <i class="fas fa-external-link-alt ms-1"></i>
+                                </a>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+                
+                {% if species.common_name %}
+                    <div class="alert alert-info">
+                        <strong>Nombre común:</strong> {{ species.common_name }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Conservation Status Card -->
+        {% if species.conservation_status %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>Estado de Conservación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% with cs=species.conservation_status %}
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>RLCVS</h6>
+                                <span class="badge bg-{% if cs.rlcvs_status == 'PE' %}danger{% elif cs.rlcvs_status == 'PRA' %}warning{% else %}secondary{% endif %} fs-6">
+                                    {{ cs.get_rlcvs_status_display }}
+                                </span>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>CITES</h6>
+                                <span class="badge bg-{% if cs.cites_status != 'NONE' %}danger{% else %}secondary{% endif %} fs-6">
+                                    {% if cs.cites_status != 'NONE' %}{{ cs.cites_status }}{% else %}No listada{% endif %}
+                                </span>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>UICN</h6>
+                                <span class="badge bg-{% if cs.iucn_status in 'CR,EN' %}danger{% elif cs.iucn_status in 'VU,NT' %}warning{% else %}secondary{% endif %} fs-6">
+                                    {{ cs.get_iucn_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        {% if cs.endemic_to_acat %}
+                            <div class="alert alert-success mt-3">
+                                <i class="fas fa-star me-2"></i>
+                                <strong>Especie endémica del ACAT</strong>
+                            </div>
+                        {% endif %}
+                        
+                        {% if cs.is_threatened %}
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Esta especie presenta algún grado de amenaza según las clasificaciones internacionales.</strong>
+                            </div>
+                        {% endif %}
+                        
+                        {% if cs.notes %}
+                            <div class="mt-3">
+                                <h6>Notas adicionales:</h6>
+                                <p class="text-muted">{{ cs.notes }}</p>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Occurrence Records -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-map-marker-alt me-2"></i>
+                    Registros de Presencia ({{ total_occurrences }})
+                </h5>
+                {% if total_occurrences > 10 %}
+                    <a href="{% url 'biodiversity:occurrence_list' %}?species={{ species.pk }}" 
+                       class="btn btn-sm btn-outline-primary">
+                        Ver todos
+                    </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if occurrences %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Localidad</th>
+                                    <th>Coordenadas</th>
+                                    <th>Tipo de Registro</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for occurrence in occurrences %}
+                                    <tr>
+                                        <td>
+                                            {% if occurrence.event_date %}
+                                                {{ occurrence.event_date|date:"d/m/Y" }}
+                                            {% elif occurrence.year %}
+                                                {{ occurrence.year }}
+                                            {% else %}
+                                                <span class="text-muted">Sin fecha</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if occurrence.locality %}
+                                                {{ occurrence.locality|truncatechars:30 }}
+                                            {% else %}
+                                                {{ occurrence.state_province|default:"Sin localidad" }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small class="font-monospace">
+                                                {{ occurrence.decimal_latitude|floatformat:4 }}, 
+                                                {{ occurrence.decimal_longitude|floatformat:4 }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <small class="badge bg-light text-dark">
+                                                {{ occurrence.basis_of_record|default:"No especificado" }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'biodiversity:occurrence_detail' occurrence.pk %}" 
+                                               class="btn btn-sm btn-outline-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-map-marker-alt fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No hay registros de presencia disponibles para esta especie.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Temporal Distribution -->
+        {% if yearly_distribution %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Distribución Temporal
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="yearlyChart" height="100"></canvas>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Quick Stats Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">Estadísticas Rápidas</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                    <span class="text-muted">Total registros:</span>
+                    <strong>{{ total_occurrences }}</strong>
+                </div>
+                {% if has_occurrences %}
+                    <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                        <span class="text-muted">Rango de años:</span>
+                        <strong>
+                            {% if yearly_distribution %}
+                                {{ yearly_distribution.0.year }} - {{ yearly_distribution|last.year }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </strong>
+                    </div>
+                {% endif %}
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Última actualización GBIF:</span>
+                    <strong>
+                        {% if species.last_gbif_update %}
+                            {{ species.last_gbif_update|date:"d/m/Y" }}
+                        {% else %}
+                            <span class="text-muted">N/A</span>
+                        {% endif %}
+                    </strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Preview -->
+        {% if has_occurrences %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Vista Previa del Mapa</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="preview-map" style="height: 250px;"></div>
+                </div>
+                <div class="card-footer text-center">
+                    <a href="{% url 'biodiversity:species_map' species.pk %}" 
+                       class="btn btn-success btn-sm">
+                        <i class="fas fa-expand me-1"></i> Ver mapa completo
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Related Species -->
+        {% if related_species %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Especies Relacionadas ({{ species.genus }})</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for related in related_species %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{% url 'biodiversity:species_detail' related.pk %}" 
+                                   class="text-decoration-none">
+                                    <em>{{ related.scientific_name }}</em>
+                                </a>
+                                {% if related.common_name %}
+                                    <br><small class="text-muted">{{ related.common_name }}</small>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-secondary rounded-pill">
+                                {{ related.occurrence_count }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block biodiversity_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize map preview if occurrences exist
+        {% if has_occurrences %}
+            const previewMap = initializeMap('preview-map', {
+                center: [{{ map_bounds.min_lat|default:10.3 }}, {{ map_bounds.min_lon|default:-84.5 }}],
+                zoom: 10
+            });
+
+            // Add occurrence markers
+            {% for occurrence in occurrences %}
+                {% if occurrence.decimal_latitude and occurrence.decimal_longitude %}
+                    L.marker([{{ occurrence.decimal_latitude }}, {{ occurrence.decimal_longitude }}])
+                        .addTo(previewMap)
+                        .bindPopup(`
+                            <strong>{{ species.scientific_name }}</strong><br>
+                            {% if occurrence.locality %}{{ occurrence.locality }}<br>{% endif %}
+                            {% if occurrence.event_date %}{{ occurrence.event_date|date:"d/m/Y" }}{% endif %}
+                        `);
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        // Initialize yearly distribution chart
+        {% if yearly_distribution %}
+            const ctx = document.getElementById('yearlyChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [{% for item in yearly_distribution %}'{{ item.year }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+                    datasets: [{
+                        label: 'Registros por año',
+                        data: [{% for item in yearly_distribution %}{{ item.count }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        {% endif %}
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inventario de Biodiversidad - ACAT{% endblock %}
+
+{% block extra_css %}
+    <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .species-card {
+            transition: transform 0.2s;
+        }
+        .species-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .conservation-badge {
+            font-size: 0.75rem;
+        }
+        .map-container {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .filter-sidebar {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .taxonomy-hierarchy {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .occurrence-marker {
+            background-color: #28a745;
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 10px;
+            height: 10px;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .loading .loading-spinner {
+            display: inline-block;
+        }
+    </style>
+{% endblock %}
+
+{% block nav_biodiversity %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard:index' %}">Inicio</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'biodiversity:species_list' %}">Biodiversidad</a></li>
+            {% block breadcrumb %}{% endblock %}
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h2 text-primary">
+                <i class="fas fa-leaf me-2"></i>
+                {% block page_title %}Inventario de Biodiversidad{% endblock %}
+            </h1>
+            <p class="text-muted">
+                {% block page_description %}Gestión y consulta del inventario de especies del ACAT{% endblock %}
+            </p>
+        </div>
+        <div class="col-auto">
+            {% block page_actions %}
+            <div class="btn-group" role="group">
+                <a href="{% url 'biodiversity:species_list' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-list me-1"></i> Especies
+                </a>
+                <a href="{% url 'biodiversity:occurrence_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-map-marker-alt me-1"></i> Registros
+                </a>
+                <a href="{% url 'biodiversity:occurrence_map' %}" class="btn btn-outline-success">
+                    <i class="fas fa-map me-1"></i> Mapa
+                </a>
+                <a href="{% url 'biodiversity:statistics' %}" class="btn btn-outline-info">
+                    <i class="fas fa-chart-bar me-1"></i> Estadísticas
+                </a>
+            </div>
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    {% block main_content %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global JavaScript functions for biodiversity app
+        
+        // Initialize map with ACAT bounds
+        function initializeMap(containerId, options = {}) {
+            const defaultOptions = {
+                center: [10.3, -84.5], // ACAT approximate center
+                zoom: 9,
+                minZoom: 8,
+                maxZoom: 18
+            };
+            
+            const mapOptions = { ...defaultOptions, ...options };
+            const map = L.map(containerId, mapOptions);
+            
+            // Add base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Add ACAT boundary (approximate)
+            const acatBounds = L.latLngBounds(
+                [8.5, -85.5],  // Southwest
+                [11.5, -82.5]  // Northeast
+            );
+            
+            // Keep map within ACAT bounds
+            map.setMaxBounds(acatBounds);
+            
+            return map;
+        }
+        
+        // Format conservation status badges
+        function formatConservationBadges(conservationStatus) {
+            let badges = '';
+            
+            if (conservationStatus.rlcvs_status !== 'NR') {
+                badges += `<span class="badge bg-warning conservation-badge me-1">RLCVS: ${conservationStatus.rlcvs_status}</span>`;
+            }
+            
+            if (conservationStatus.cites_status !== 'NONE') {
+                badges += `<span class="badge bg-danger conservation-badge me-1">CITES: ${conservationStatus.cites_status}</span>`;
+            }
+            
+            if (!['LC', 'NE'].includes(conservationStatus.iucn_status)) {
+                badges += `<span class="badge bg-info conservation-badge me-1">UICN: ${conservationStatus.iucn_status}</span>`;
+            }
+            
+            if (conservationStatus.endemic_to_acat) {
+                badges += `<span class="badge bg-success conservation-badge me-1">Endémica ACAT</span>`;
+            }
+            
+            return badges || '<span class="text-muted">Sin estado especial</span>';
+        }
+        
+        // Show loading state
+        function showLoading(element) {
+            element.classList.add('loading');
+            element.style.opacity = '0.7';
+        }
+        
+        // Hide loading state
+        function hideLoading(element) {
+            element.classList.remove('loading');
+            element.style.opacity = '1';
+        }
+        
+        // Format scientific name with italics
+        function formatScientificName(name) {
+            return `<em>${name}</em>`;
+        }
+        
+        // Format taxonomy hierarchy
+        function formatTaxonomyHierarchy(species) {
+            return `${species.kingdom} > ${species.phylum} > ${species.class_name} > ${species.order} > ${species.family}`;
+        }
+    </script>
+    
+    {% block biodiversity_js %}{% endblock %}
+{% endblock %}
